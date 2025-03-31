@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="search-form">
+    <form action="/" method="GET">
+        <input type="text" name="search" placeholder="Search for plant diseases..." class="search-input" value="{{ search_query }}">
+        <button type="submit" class="search-button">Search</button>
+    </form>
+</div>
+
+<div class="blog-container">
+    {% if blogs %}
+        {% for blog in blogs %}
+        <div class="blog-card">
+            <div class="blog-image-container">
+                <img src="{{ blog.Image }}" alt="{{ blog.Title }}" class="blog-image" onerror="this.src='/static/images/default.jpg'">
+            </div>
+            <div class="blog-content">
+                <h2 class="blog-title"><a href="{{ url_for('blog_details', url=blog.URL) }}">{{ blog.Title }}</a></h2>
+                {% if blog.Description and blog.Description != "No Description" %}
+                    <p class="blog-description">{{ blog.Description|truncate(100) }}</p>
+                {% else %}
+                    <p class="blog-description">Click to learn more about this.</p>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <p>No plant disease blogs found. Please try a different search term or check back later.</p>
+    {% endif %}
+</div>
+{% endblock %}

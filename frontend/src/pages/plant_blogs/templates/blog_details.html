@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="blog-details">
+    <h1>{{ blog.Title }}</h1>
+    
+    <img src="{{ blog.Image }}" alt="{{ blog.Title }}" style="max-width: 100%; margin: 20px 0; border-radius: 8px;" onerror="this.src='/static/images/default.jpg'">
+    
+    {% if content_html is defined %}
+        <div class="blog-full-content">
+            {{ content_html|safe }}
+        </div>
+    {% else %}
+        <div class="blog-content">
+            {% if blog.Description and blog.Description != "No Description" %}
+                <p>{{ blog.Description }}</p>
+            {% endif %}
+            <p>To read the full article, please visit: <a href="{{ blog.URL }}" target="_blank">{{ blog.Title }}</a></p>
+        </div>
+    {% endif %}
+    
+    <a href="/" class="back-button">← Back to Blog List</a>
+</div>
+{% endblock %}
