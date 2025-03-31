@@ -164,11 +164,14 @@ const LandingPage = () => {
               title="Treatment History"
               description="Track your crop's health history and get personalized treatment recommendations"
             />
-            <FeatureCard 
-              icon={<Bell className="w-8 h-8 text-green-600" />}
-              title="Smart Alerts"
-              description="Receive timely notifications about disease outbreaks and weather conditions"
-            />
+           
+            <Link to="/blogs">
+              <FeatureCard 
+                icon={<Bell className="w-8 h-8 text-green-600" />}
+                title="Smart Alerts"
+                description="Receive timely notifications about disease outbreaks and weather conditions"
+              />
+            </Link>
             <FeatureCard 
               icon={<Volume2 className="w-8 h-8 text-green-600" />}
               title="Voice Assistance"

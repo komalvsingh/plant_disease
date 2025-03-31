@@ -9,6 +9,8 @@ import SignInPage from "./components/signin";
 import SignUpPage from "./components/signup";
 import PlantCareVideos from "./pages/plantCare";
 import MarketDashboard from "./pages/MarketDashboars";
+import BlogSection from "./pages/BlogSection";
+
 function App(){
   return (
 <BrowserRouter>
@@ -23,6 +25,8 @@ function App(){
   <Route path="/sign-in/sso-callback" element={<SignInPage />} />
   <Route path="/videos" element={<PlantCareVideos/>} />
   <Route path="/market" element={<MarketDashboard/>} />
+  <Route path="/blogs" element={<BlogSection/>} />
+  
 </Routes>
 </BrowserRouter>
   );
