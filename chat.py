@@ -1,224 +1,305 @@
-from fastapi import FastAPI, UploadFile, File
-from fastapi.responses import FileResponse
-from pydantic import BaseModel
 import os
-import time
-from pathlib import Path
-from langchain.embeddings import HuggingFaceEmbeddings
-from langchain.vectorstores import Chroma
-from langchain.document_loaders import TextLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from fastapi.middleware.cors import CORSMiddleware
-import speech_recognition as sr
-from googletrans import Translator
-from gtts import gTTS
-import tempfile
 import uuid
+import time
+import tempfile
+from pathlib import Path
+
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+
+import speech_recognition as sr
+from deep_translator import GoogleTranslator
+from gtts import gTTS
+from langdetect import detect
+
+from groq import Groq
+from dotenv import load_dotenv
+
+# Langchain and ChromaDB imports
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.vectorstores import Chroma
+from langchain_community.document_loaders import TextLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+
+# Load environment variables
+load_dotenv()
 
 app = FastAPI()
 
-# Enable CORS for frontend communication
+# Enable CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Update this with your frontend URL
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Create directories for storing audio files
+# Audio files directory
 UPLOAD_DIR = Path("audio_files")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
-# Define input schema
+# Initialize Groq client
+groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+
+# ChromaDB Configuration
+CHROMA_DIR = Path("./chroma_db")
+CHROMA_DIR.mkdir(exist_ok=True)
+
+# Embedding model
+EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+
+def load_and_store_data(data_file="disease.txt"):
+    """
+    Load and store data in ChromaDB vector store
+    """
+    loader = TextLoader(data_file)
+    docs = loader.load()
+    
+    # Split documents into chunks
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=500, 
+        chunk_overlap=50
+    )
+    texts = text_splitter.split_documents(docs)
+    
+    # Create embeddings
+    embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
+    
+    # Create or update ChromaDB
+    db = Chroma.from_documents(
+        texts, 
+        embeddings, 
+        persist_directory=str(CHROMA_DIR)
+    )
+    return db
+
+# Initialize or load ChromaDB
+try:
+    embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
+    vectorstore = Chroma(
+        persist_directory=str(CHROMA_DIR), 
+        embedding_function=embeddings
+    )
+except:
+    vectorstore = load_and_store_data()
+
 class QueryModel(BaseModel):
     message: str
 
-# Initialize translator
-translator = Translator()
-
-# Load dataset
-DATA_FILE = "disease.txt"
-
-
-def load_and_store_data():
-    loader = TextLoader(DATA_FILE)
-    docs = loader.load()
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-    texts = text_splitter.split_documents(docs)
-    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-    db = Chroma.from_documents(texts, embeddings, persist_directory="./chroma_db")
-    return db
-
-# Load data into ChromaDB
-if not os.path.exists("./chroma_db"):
-    db = load_and_store_data()
-else:
-    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-    db = Chroma(persist_directory="./chroma_db", embedding_function=embeddings)
-
-retriever = db.as_retriever()
-
 def detect_language(text):
-    """Detect the language of input text"""
+    """Detect language of the input text."""
     try:
-        detection = translator.detect(text)
-        return detection.lang
-    except Exception as e:
-        print(f"Language detection error: {e}")
+        return detect(text)
+    except:
         return 'en'
 
-def generate_audio_response(text, lang='en'):
-    """Generate audio file from text and return the filename"""
+def get_translator(target_lang='en'):
+    """Get a translator for the specified target language."""
+    return GoogleTranslator(source='auto', target=target_lang)
+
+def text_to_speech(text, lang='en'):
+    """Convert text to speech and save as an audio file."""
     try:
         # Generate unique filename
-        filename = f"{uuid.uuid4()}.mp3"
-        filepath = UPLOAD_DIR / filename
+        audio_filename = f"{uuid.uuid4()}.mp3"
+        filepath = UPLOAD_DIR / audio_filename
         
-        # Generate audio file
-        tts = gTTS(text=text, lang=lang)
+        # Use gTTS for text-to-speech
+        tts = gTTS(text=text[:500], lang=lang, slow=False)
         tts.save(str(filepath))
         
-        return filename
+        return audio_filename
     except Exception as e:
-        print(f"Error generating audio: {e}")
+        print(f"Text-to-speech error: {e}")
         return None
+
+def retrieve_context(query, top_k=3):
+    """
+    Retrieve relevant context from ChromaDB
+    """
+    try:
+        # Retrieve top k most similar documents
+        docs = vectorstore.similarity_search(query, k=top_k)
+        
+        # Combine retrieved documents into context
+        context = "\n\n".join([doc.page_content for doc in docs])
+        return context
+    except Exception as e:
+        print(f"Context retrieval error: {e}")
+        return ""
+
+def generate_groq_response(message, context=""):
+    """Generate a response using Groq API with optional context."""
+    try:
+        # Prepare prompt with context
+        full_prompt = f"""Context: {context}
+
+        User Query: {message}
+
+        Based on the provided context and query, please provide a helpful and informative response."""
+
+        chat_completion = groq_client.chat.completions.create(
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a helpful medical information assistant specializing in providing clear, concise, and accurate information about diseases and health conditions. Use the provided context to inform your response."
+                },
+                {
+                    "role": "user",
+                    "content": full_prompt
+                }
+            ],
+            model="llama3-8b-8192"
+        )
+        return chat_completion.choices[0].message.content
+    except Exception as e:
+        print(f"Groq API error: {e}")
+        return "I'm sorry, but I couldn't process your request at the moment."
+
+@app.post("/chat")
+async def chat(query: QueryModel):
+    """
+    Process chat messages with translation and text-to-speech support.
+    """
+    try:
+        # Detect language of input
+        lang = detect_language(query.message)
+        
+        # Retrieve context from ChromaDB
+        context = retrieve_context(query.message)
+        
+        # Generate response using Groq with context
+        response_text = generate_groq_response(query.message, context)
+        
+        # Translate if not in English
+        if lang != 'en':
+            try:
+                translator = get_translator(lang)
+                response_text = translator.translate(response_text)
+            except Exception as e:
+                print(f"Translation error: {e}")
+                lang = 'en'
+        
+        # Convert to speech
+        audio_filename = text_to_speech(response_text, lang)
+        
+        return {
+            "text_response": response_text,
+            "context": context,
+            "audio_file_path": audio_filename,
+            "detected_language": lang
+        }
+    except Exception as e:
+        print(f"Error: {e}")
+        return {
+            "error": str(e),
+            "text_response": "Error processing request",
+            "audio_file_path": None,
+            "detected_language": "en"
+        }
 
 @app.post("/voice-input")
 async def process_voice(file: UploadFile = File(...)):
-    # Create a temporary file with .wav extension
+    """
+    Process voice input, transcribe, and generate a response.
+    """
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
     try:
-        # Write uploaded file content
+        # Save uploaded audio file
         content = await file.read()
         temp_file.write(content)
         temp_file.close()
 
         # Initialize speech recognizer
         recognizer = sr.Recognizer()
-        
-        # Convert speech to text
         with sr.AudioFile(temp_file.name) as source:
-            # Adjust for ambient noise
             recognizer.adjust_for_ambient_noise(source)
             audio = recognizer.record(source)
-            
-        # Try Hindi first, then English
+        
+        # Attempt transcription (with Hindi support)
         try:
+            # Try Hindi first
             text = recognizer.recognize_google(audio, language="hi-IN")
-            detected_lang = 'hi'
-        except sr.UnknownValueError:
-            try:
-                text = recognizer.recognize_google(audio)
-                detected_lang = 'en'
-            except sr.UnknownValueError:
-                raise Exception("Could not understand the audio")
-        except Exception as e:
+            lang = 'hi'
+        except:
+            # Fallback to default
             text = recognizer.recognize_google(audio)
-            detected_lang = 'en'
+            lang = 'en'
 
-        # Get response from ChromaDB
-        docs = retriever.get_relevant_documents(text)
-        if not docs:
-            response_text = "Sorry, I couldn't find an answer."
-        else:
-            response_text = docs[0].page_content
+        # Retrieve context from ChromaDB
+        context = retrieve_context(text)
 
-        # Translate response if needed
-        if detected_lang == 'hi':
+        # Generate response
+        response_text = generate_groq_response(text, context)
+        
+        # Translate if needed
+        if lang != 'en':
             try:
-                response_text = translator.translate(response_text, dest='hi').text
+                translator = get_translator(lang)
+                response_text = translator.translate(response_text)
             except Exception as e:
                 print(f"Translation error: {e}")
-                # Fallback to English if translation fails
-                detected_lang = 'en'
+                lang = 'en'
 
-        # Generate audio response
-        audio_filename = generate_audio_response(response_text, detected_lang)
+        # Convert to speech
+        audio_filename = text_to_speech(response_text, lang)
 
         return {
             "transcribed_text": text,
             "text_response": response_text,
+            "context": context,
             "audio_file_path": audio_filename,
-            "detected_language": detected_lang
+            "detected_language": lang
         }
-
     except Exception as e:
-        print(f"Error processing voice: {e}")
-        error_message = "Sorry, I encountered an error while processing your voice input. Please try again."
-        error_audio = generate_audio_response(error_message, "en")
+        print(f"Error: {e}")
         return {
             "error": str(e),
-            "text_response": error_message,
-            "audio_file_path": error_audio,
+            "text_response": "Error processing request",
+            "audio_file_path": None,
             "detected_language": "en"
         }
     finally:
         # Clean up temporary file
-        try:
+        if os.path.exists(temp_file.name):
             os.unlink(temp_file.name)
-        except Exception as e:
-            print(f"Error removing temp file: {e}")
-
-@app.post("/chat")
-async def chat(query: QueryModel):
-    try:
-        # Detect language
-        detected_lang = detect_language(query.message)
-        
-        # Get response from ChromaDB
-        docs = retriever.get_relevant_documents(query.message)
-        response_text = docs[0].page_content if docs else "Sorry, I couldn't find an answer."
-
-        # Translate response if needed
-        if detected_lang == 'hi':
-            try:
-                response_text = translator.translate(response_text, dest='hi').text
-            except Exception as e:
-                print(f"Translation error: {e}")
-                detected_lang = 'en'
-
-        # Generate audio response
-        audio_filename = generate_audio_response(response_text, detected_lang)
-
-        return {
-            "text_response": response_text,
-            "audio_file_path": audio_filename,
-            "detected_language": detected_lang
-        }
-    except Exception as e:
-        print(f"Error in chat: {e}")
-        error_message = "Sorry, I encountered an error. Please try again."
-        error_audio = generate_audio_response(error_message, "en")
-        return {
-            "error": str(e),
-            "text_response": error_message,
-            "audio_file_path": error_audio,
-            "detected_language": "en"
-        }
 
 @app.get("/audio/{filename}")
 async def get_audio(filename: str):
+    """
+    Retrieve audio files.
+    """
     file_path = UPLOAD_DIR / filename
     if not file_path.exists():
-        return {"error": "Audio file not found"}
+        raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(str(file_path))
 
-def cleanup_audio_files():
-    """Clean up old audio files"""
+@app.post("/update-database")
+async def update_database(file: UploadFile = File(...)):
+    """
+    Update the ChromaDB with a new text file
+    """
     try:
-        current_time = time.time()
-        for file in UPLOAD_DIR.glob("*.mp3"):
-            # Remove files older than 1 hour
-            if current_time - file.stat().st_mtime > 3600:
-                file.unlink()
-    except Exception as e:
-        print(f"Error cleaning up audio files: {e}")
+        # Save uploaded file
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.txt')
+        content = await file.read()
+        temp_file.write(content)
+        temp_file.close()
 
-# Cleanup old audio files periodically
-@app.on_event("startup")
-async def startup_event():
-    cleanup_audio_files()
+        # Reload database with new file
+        global vectorstore
+        vectorstore = load_and_store_data(temp_file.name)
+
+        # Clean up temporary file
+        os.unlink(temp_file.name)
+
+        return {"status": "Database updated successfully"}
+    except Exception as e:
+        print(f"Database update error: {e}")
+        return {"error": str(e)}
 
 if __name__ == "__main__":
     import uvicorn

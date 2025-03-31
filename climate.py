@@ -7,6 +7,11 @@ import os
 from email.mime.text import MIMEText
 import smtplib
 from typing import Dict
+import uvicorn
+from fastapi import FastAPI
+
+
+
 
 app = FastAPI()
 
@@ -172,3 +177,11 @@ async def test_weather():
     """A simple endpoint to test the weather API without requiring a POST request"""
     weather_data = check_weather(DEFAULT_LAT, DEFAULT_LON)
     return weather_data
+
+if __name__ == "__main__":
+    uvicorn.run(
+        "main:app", 
+        host="0.0.0.0", 
+        port=8001,  # Change this to your desired port
+        reload=True  # Optional: enables auto-reload during development
+    )

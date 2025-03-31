@@ -70,37 +70,34 @@ const WeatherAlertsDashboard = () => {
   // Geocoding function to convert location name to coordinates
   const geocodeAddress = async (address) => {
     try {
-      setLoading(true);
       const response = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`
       );
       const data = await response.json();
-
+  
       if (data.length > 0) {
         const { lat, lon } = data[0];
         const parsedLat = parseFloat(lat);
         const parsedLon = parseFloat(lon);
         
+        // Update map center and marker
         setMapCenter([parsedLat, parsedLon]);
         setMarkerPosition([parsedLat, parsedLon]);
+        
+        // Update user location state
         setUserLocation({
           lat: parsedLat,
           lon: parsedLon
         });
-        setIsMapVisible(true);
         
         // Fetch weather data for the new location
         fetchWeatherData({
           lat: parsedLat,
           lon: parsedLon
         });
-      } else {
-        setError('Could not find the specified location. Please try a different search term.');
       }
     } catch (error) {
       setError('Error finding location: ' + error.message);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -123,7 +120,7 @@ const WeatherAlertsDashboard = () => {
   const fetchWeatherData = async (location = userLocation) => {
     try {
       setLoading(true);
-      const response = await fetch('http://127.0.0.1:8000/api/weather-alerts', {
+      const response = await fetch('http://127.0.0.1:8001/api/weather-alerts', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
