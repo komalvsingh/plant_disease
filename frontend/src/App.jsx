@@ -10,6 +10,7 @@ import SignUpPage from "./components/signup";
 import PlantCareVideos from "./pages/plantCare";
 import MarketDashboard from "./pages/MarketDashboars";
 import BlogSection from "./pages/BlogSection";
+import AboutUs from "./pages/aboutUs";
 
 function App(){
   return (
@@ -26,6 +27,7 @@ function App(){
   <Route path="/videos" element={<PlantCareVideos/>} />
   <Route path="/market" element={<MarketDashboard/>} />
   <Route path="/blogs" element={<BlogSection/>} />
+  <Route path="/about-us" element={<AboutUs/>} />
   
 </Routes>
 </BrowserRouter>
