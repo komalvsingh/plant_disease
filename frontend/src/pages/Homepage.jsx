@@ -26,6 +26,7 @@ const LandingPage = () => {
               <NavLink href="#features">Features</NavLink>
               <NavLink href="#how-it-works">How It Works</NavLink>
               <NavLink href="#about">About</NavLink>
+              <NavLink href="/videos">Tutorials</NavLink>
               
               <button 
                 onClick={() => window.location.href = '/sign-up'} 
@@ -51,9 +52,13 @@ const LandingPage = () => {
                 <MessageSquare className="w-5 h-5 mr-1" />
                 <span>Chatbot</span>
               </Link>
-              <Link to="/check-disease" className="flex items-center text-gray-600 hover:text-green-600 transition-colors">
+              <Link to="/detection" className="flex items-center text-gray-600 hover:text-green-600 transition-colors">
                 <Scan className="w-5 h-5 mr-1" />
                 <span>Check Disease</span>
+              </Link>
+              <Link to="/videos" className="flex items-center text-gray-600 hover:text-green-600 transition-colors">
+                <Scan className="w-5 h-5 mr-1" />
+                <span>Tutorials</span>
               </Link>
               <div className="ml-4">
                 <UserButton />
@@ -80,6 +85,7 @@ const LandingPage = () => {
             <NavLink href="#features" mobile>Features</NavLink>
             <NavLink href="#how-it-works" mobile>How It Works</NavLink>
             <NavLink href="#about" mobile>About</NavLink>
+            <NavLink href="/videos">Tutorials</NavLink>
             <button 
               onClick={() => window.location.href = '/sign-up'}
               className="w-full mt-4 px-6 py-2 bg-green-600 text-white rounded-full hover:bg-green-700 transition-colors"
@@ -103,10 +109,14 @@ const LandingPage = () => {
               <MessageSquare className="w-5 h-5 mr-2" />
               <span>Chatbot</span>
             </Link>
-            <Link to="/check-disease" className="flex items-center py-2 text-gray-600 hover:text-green-600 transition-colors">
+            <Link to="/detection" className="flex items-center py-2 text-gray-600 hover:text-green-600 transition-colors">
               <Scan className="w-5 h-5 mr-2" />
               <span>Check Disease</span>
             </Link>
+            <Link to="/videos" className="flex items-center text-gray-600 hover:text-green-600 transition-colors">
+                <Scan className="w-5 h-5 mr-1" />
+                <span>Tutorials</span>
+              </Link>
             <div className="flex items-center justify-center mt-4">
               <UserButton />
             </div>
@@ -154,11 +164,14 @@ const LandingPage = () => {
               title="Treatment History"
               description="Track your crop's health history and get personalized treatment recommendations"
             />
-            <FeatureCard 
-              icon={<Bell className="w-8 h-8 text-green-600" />}
-              title="Smart Alerts"
-              description="Receive timely notifications about disease outbreaks and weather conditions"
-            />
+           
+            <Link to="/blogs">
+              <FeatureCard 
+                icon={<Bell className="w-8 h-8 text-green-600" />}
+                title="Smart Alerts"
+                description="Receive timely notifications about disease outbreaks and weather conditions"
+              />
+            </Link>
             <FeatureCard 
               icon={<Volume2 className="w-8 h-8 text-green-600" />}
               title="Voice Assistance"

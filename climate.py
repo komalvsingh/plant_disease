@@ -8,10 +8,28 @@ from email.mime.text import MIMEText
 import smtplib
 from typing import Dict
 import uvicorn
-from fastapi import FastAPI
+import tensorflow as tf
+from tensorflow.keras.models import load_model
+import numpy as np
+from PIL import Image
+import io
+from fastapi import File, UploadFile, Form
 
+# Custom object to handle the 'batch_shape' issue
+class CustomInputLayer(tf.keras.layers.InputLayer):
+    def __init__(self, batch_shape=None, **kwargs):
+        if batch_shape is not None:
+            kwargs['input_shape'] = batch_shape[1:]
+        super().__init__(**kwargs)
 
-
+# Load the model with custom objects
+try:
+    model = load_model("pdd.h5", custom_objects={'InputLayer': CustomInputLayer})
+    print("Model loaded successfully")
+except Exception as e:
+    print(f"Error loading model: {str(e)}")
+    # Create a placeholder model in case of loading failure
+    model = None
 
 app = FastAPI()
 
@@ -93,6 +111,39 @@ async def get_plant_care_recommendations(weather_data: Dict) -> str:
         response = response[len(prompt):].strip()
     
     return response
+
+# Function to preprocess image for disease detection
+def preprocess_image(image_bytes):
+    img = Image.open(io.BytesIO(image_bytes))
+    img = img.resize((224, 224))  # Resize to model input size
+    img_array = np.array(img) / 255.0  # Normalize
+    return np.expand_dims(img_array, axis=0)  # Add batch dimension
+
+@app.post("/api/detect-disease")
+async def detect_disease(file: UploadFile = File(...)):
+    if model is None:
+        return {"error": "Model not loaded properly. Please check server logs."}
+    
+    try:
+        # Read and preprocess the image
+        contents = await file.read()
+        img = preprocess_image(contents)
+        
+        # Make prediction
+        prediction = model.predict(img)
+        
+        # Process prediction (replace with your actual classes)
+        class_names = ["Healthy", "Disease1", "Disease2", "Disease3"]  # Replace with your actual class names
+        predicted_class = class_names[np.argmax(prediction[0])]
+        confidence = float(np.max(prediction[0]))
+        
+        return {
+            "disease": predicted_class,
+            "confidence": confidence,
+            "recommendations": f"Recommendations for {predicted_class}"
+        }
+    except Exception as e:
+        return {"error": f"Error processing image: {str(e)}"}
 
 @app.post("/api/weather-alerts")
 async def create_weather_alert(background_tasks: BackgroundTasks, user_data: Dict = None):

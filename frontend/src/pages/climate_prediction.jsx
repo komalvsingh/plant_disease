@@ -120,7 +120,7 @@ const WeatherAlertsDashboard = () => {
   const fetchWeatherData = async (location = userLocation) => {
     try {
       setLoading(true);
-      const response = await fetch('http://127.0.0.1:8001/api/weather-alerts', {
+      const response = await fetch('http://localhost:8001/api/weather-alerts', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
