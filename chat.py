@@ -135,17 +135,18 @@ def generate_groq_response(message, context=""):
     """Generate a response using Groq API with optional context."""
     try:
         # Prepare prompt with context
-        full_prompt = f"""Context: {context}
+        full_prompt = f"""Context information (use only if relevant to the query):
+        {context}
 
         User Query: {message}
 
-        Based on the provided context and query, please provide a helpful and informative response."""
+        Answer the query directly and naturally without mentioning whether the information was in the context or not."""
 
         chat_completion = groq_client.chat.completions.create(
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a helpful medical information assistant specializing in providing clear, concise, and accurate information about diseases and health conditions. Use the provided context to inform your response."
+                    "content": "You are a helpful medical information assistant. Provide clear, accurate information about health topics. Answer directly without discussing what context you have or don't have. If you don't have relevant information, simply provide a brief, helpful general answer without mentioning limitations in your knowledge."
                 },
                 {
                     "role": "user",
@@ -158,7 +159,6 @@ def generate_groq_response(message, context=""):
     except Exception as e:
         print(f"Groq API error: {e}")
         return "I'm sorry, but I couldn't process your request at the moment."
-
 @app.post("/chat")
 async def chat(query: QueryModel):
     """
