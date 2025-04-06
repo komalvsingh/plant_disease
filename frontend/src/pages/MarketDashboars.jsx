@@ -270,19 +270,26 @@ const MarketDashboard = () => {
   };
 
   return (
-    <div className="p-4 bg-gray-50 min-h-screen">
+    <div className="p-4 min-h-screen bg-gradient-to-b from-green-50 to-green-100">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Agricultural Market Analysis Dashboard</h1>
+        <div className='my-10'>
+            <h1 className="text-4xl font-bold text-green-800">Agricultural Market Analysis Dashboard</h1>
+        </div>
+    
         <div className="flex gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Crop</label>
+            <label className="block text-sm font-medium text-green-900 mb-1">Crop</label>
             <Select value={selectedCrop} onValueChange={setSelectedCrop}>
-              <SelectTrigger className="w-40">
+              <SelectTrigger className="w-40 bg-green-700 text-white">
                 <SelectValue placeholder="Select Crop" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-white text-slate-800">
                 {crops.map(crop => (
-                  <SelectItem key={crop} value={crop}>
+                  <SelectItem 
+                  key={crop} 
+                  value={crop}
+                  className="hover:bg-gray-100 focus:bg-gray-100"
+                  >
                     {crop}
                   </SelectItem>
                 ))}
@@ -290,14 +297,18 @@ const MarketDashboard = () => {
             </Select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Market</label>
+            <label className="block text-sm font-medium text-green-900 mb-1">Market</label>
             <Select value={selectedMarket} onValueChange={setSelectedMarket}>
-              <SelectTrigger className="w-40">
+              <SelectTrigger className="w-40 bg-green-700 text-white">
                 <SelectValue placeholder="Select Market" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-white text-slate-800 ">
                 {markets.map(market => (
-                  <SelectItem key={market} value={market}>
+                  <SelectItem
+                   key={market} 
+                   value={market}
+                   className="hover:bg-gray-100 focus:bg-gray-100"
+                   >
                     {market}
                   </SelectItem>
                 ))}
@@ -332,7 +343,7 @@ const MarketDashboard = () => {
           <Card className="bg-white shadow">
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center">
-                <TrendingUp className="w-5 h-5 mr-2 text-blue-600" />
+                <TrendingUp className="w-5 h-5 mr-2 text-green-600" />
                 Market with Significant Movement
               </CardTitle>
             </CardHeader>

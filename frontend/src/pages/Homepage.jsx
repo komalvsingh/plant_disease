@@ -279,7 +279,7 @@
 
 
 import React, { useState } from 'react';
-import { MessageCircle, Camera, Bell, History, Volume2, Globe, CloudSun, MessageSquare, Scan } from 'lucide-react';
+import { MessageCircle, Camera, Bell, History, Volume2, Globe, CloudSun, MessageSquare, Scan, Film, TrendingUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { SignedIn, SignedOut, useAuth } from "@clerk/clerk-react";
 import { UserButton } from "@clerk/clerk-react";
@@ -337,8 +337,12 @@ const LandingPage = () => {
                 <span>Check Disease</span>
               </Link>
               <Link to="/videos" className="flex items-center text-gray-600 hover:text-green-600 transition-colors">
-                <Scan className="w-5 h-5 mr-1" />
+                <Film className="w-5 h-5 mr-1" />
                 <span>Tutorials</span>
+              </Link>
+              <Link to="/market" className="flex items-center text-gray-600 hover:text-green-600 transition-colors">
+                <TrendingUp className="w-5 h-5 mr-1" />
+                <span>Market analysis</span>
               </Link>
               <div className="ml-4">
                 <UserButton />
@@ -431,9 +435,6 @@ const LandingPage = () => {
                   className="px-8 py-3 bg-green-500 text-white rounded-lg text-lg font-semibold hover:bg-green-700 transition-colors shadow-lg hover:shadow-xl transform hover:-translate-y-1"
                 >
                   Get Started
-                </button>
-                <button className="px-8 py-3 bg-white text-green-500 border-2 border-white rounded-lg text-lg font-semibold hover:bg-green-50 transition-colors shadow-lg hover:shadow-xl transform hover:-translate-y-1">
-                  Watch Demo
                 </button>
               </div>
             </div>
