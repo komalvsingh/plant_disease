@@ -2,6 +2,7 @@ import os
 import uuid
 import time
 import tempfile
+import requests
 from pathlib import Path
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
@@ -14,7 +15,6 @@ from deep_translator import GoogleTranslator
 from gtts import gTTS
 from langdetect import detect
 
-from groq import Groq
 from dotenv import load_dotenv
 
 # Langchain and ChromaDB imports
@@ -25,6 +25,10 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 # Load environment variables
 load_dotenv()
+
+# Get API key from environment
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 app = FastAPI()
 
@@ -40,9 +44,6 @@ app.add_middleware(
 # Audio files directory
 UPLOAD_DIR = Path("audio_files")
 UPLOAD_DIR.mkdir(exist_ok=True)
-
-# Initialize Groq client
-groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 # ChromaDB Configuration
 CHROMA_DIR = Path("./chroma_db")
@@ -132,8 +133,14 @@ def retrieve_context(query, top_k=3):
         return ""
 
 def generate_groq_response(message, context=""):
-    """Generate a response using Groq API with optional context."""
+    """Generate a response using Groq API with requests instead of the Groq client."""
     try:
+        # Prepare headers
+        headers = {
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
         # Prepare prompt with context
         full_prompt = f"""Context information (use only if relevant to the query):
         {context}
@@ -142,8 +149,10 @@ def generate_groq_response(message, context=""):
 
         Answer the query directly and naturally without mentioning whether the information was in the context or not."""
 
-        chat_completion = groq_client.chat.completions.create(
-            messages=[
+        # Prepare payload
+        payload = {
+            "model": "llama3-8b-8192",
+            "messages": [
                 {
                     "role": "system",
                     "content": "You are a helpful medical information assistant. Provide clear, accurate information about health topics. Answer directly without discussing what context you have or don't have. If you don't have relevant information, simply provide a brief, helpful general answer without mentioning limitations in your knowledge."
@@ -152,13 +161,20 @@ def generate_groq_response(message, context=""):
                     "role": "user",
                     "content": full_prompt
                 }
-            ],
-            model="llama3-8b-8192"
-        )
-        return chat_completion.choices[0].message.content
+            ]
+        }
+        
+        # Make the request
+        response = requests.post(GROQ_API_URL, headers=headers, json=payload)
+        response.raise_for_status()  # Raise an exception for HTTP errors
+        
+        # Parse the response
+        result = response.json()
+        return result["choices"][0]["message"]["content"]
     except Exception as e:
         print(f"Groq API error: {e}")
         return "I'm sorry, but I couldn't process your request at the moment."
+
 @app.post("/chat")
 async def chat(query: QueryModel):
     """

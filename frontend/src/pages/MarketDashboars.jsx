@@ -3,9 +3,11 @@ import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, L
 import { Card, CardContent, CardHeader, CardTitle } from '../components/carditems';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/selectitems';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/tabsitems';
-import { Info, TrendingUp, DollarSign, BarChart3, AlertTriangle } from 'lucide-react';
+import { Info, TrendingUp, DollarSign, BarChart3, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const MarketDashboard = () => {
+  const navigate = useNavigate();
   const [crops, setCrops] = useState(['Wheat', 'Rice', 'Corn', 'Soybeans', 'Potatoes']);
   const [markets, setMarkets] = useState(['Local Market', 'Wholesale Hub', 'Export Terminal', 'Processing Plant', 'Farmers Market']);
   const [selectedCrop, setSelectedCrop] = useState('Wheat');
@@ -15,6 +17,10 @@ const MarketDashboard = () => {
   const [forecast, setForecast] = useState([]);
   const [recommendations, setRecommendations] = useState(null);
   const [activeTab, setActiveTab] = useState('trends');
+
+  const goToHomePage = () => {
+    navigate('/');
+  };
 
   // Simulated API calls - in a real application, these would fetch from the backend
   useEffect(() => {
@@ -271,9 +277,18 @@ const MarketDashboard = () => {
 
   return (
     <div className="p-4 min-h-screen bg-gradient-to-b from-green-50 to-green-100">
+      {/* Back button */}
+      <button 
+          onClick={goToHomePage}
+          className="flex items-center p-2 bg-green-50 hover:bg-green-100 rounded-full"
+        >
+          <ArrowLeft className="w-6 h-6 text-green-600" />
+
+        </button>
+
       <div className="flex justify-between items-center mb-6">
-        <div className='my-10'>
-            <h1 className="text-4xl font-bold text-green-800">Agricultural Market Analysis Dashboard</h1>
+        <div className='my-5'>
+          <h1 className="text-4xl font-bold text-green-800">Agricultural Market Analysis Dashboard</h1>
         </div>
     
         <div className="flex gap-4">
