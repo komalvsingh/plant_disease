@@ -4,7 +4,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
 // API configuration
-const API_URL = 'http://localhost:8000';
+const API_URL = 'http://localhost:8002';
 
 const ChatbotInterface = () => {
   const [message, setMessage] = useState('');
@@ -102,7 +102,7 @@ const ChatbotInterface = () => {
   // Farm tip suggestions to help farmers get started
   const suggestions = [
     "How to identify tomato leaf disease?",
-    "Best practices for rice cultivation",
+    "What are the symptoms of tomato leaf curl disease?",
     "How to protect crops from pests?",
   ];
 

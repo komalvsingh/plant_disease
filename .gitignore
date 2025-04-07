@@ -14,7 +14,8 @@ dist-ssr
 
 .env
 _pycache_
-pdd.h5
+plant_model.h5
+venv
 
 # Editor directories and files
 .vscode/*
