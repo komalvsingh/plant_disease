@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import { ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 // Instead of relying on process.env, use import.meta.env for Vite
 const API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY || "YOUR_API_KEY_HERE";
@@ -7,10 +9,15 @@ const BASE_SEARCH_QUERY = "plant care, organic farming";
 const MAX_RESULTS = 10;
 
 const PlantCareVideos = () => {
+  const navigate = useNavigate();
   const [videos, setVideos] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState("all");
+
+  const goToHomePage = () => {
+    navigate('/');
+  };
 
   const categories = [
     { id: "all", name: "All Videos" },
@@ -59,6 +66,13 @@ const PlantCareVideos = () => {
       {/* Simple header */}
       <div className="bg-gradient-to-r from-green-700 to-green-500 text-white p-6 shadow-md">
         <div className="max-w-6xl mx-auto">
+          {/* Back button */}
+          <button 
+            onClick={goToHomePage}
+            className="flex items-center p-2 mb-4 bg-green-600 hover:bg-green-700 rounded-full transition-colors"
+          >
+            <ArrowLeft className="w-6 h-6 text-white" />
+          </button>
           <h2 className="text-3xl font-bold">Explore Plant Care & Organic Farming Videos</h2>
           <p className="mt-2 opacity-90">Find helpful tutorials and tips for your garden or farm</p>
         </div>
