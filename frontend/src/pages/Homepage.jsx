@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MessageCircle, Camera, Bell, History, Volume2, Globe, CloudSun, MessageSquare, Scan, Film, TrendingUp } from 'lucide-react';
+import { MessageCircle, Camera, Bell, History, Volume2, Globe, CloudSun, MessageSquare, Scan, Film, TrendingUp ,Newspaper} from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { SignedIn, SignedOut, useAuth } from "@clerk/clerk-react";
 import { UserButton } from "@clerk/clerk-react";
@@ -63,6 +63,10 @@ const LandingPage = () => {
               <Link to="/market" className="flex items-center text-gray-600 hover:text-green-600 transition-colors">
                 <TrendingUp className="w-5 h-5 mr-1" />
                 <span>Market analysis</span>
+              </Link>
+              <Link to="/blogs" className="flex items-center text-gray-600 hover:text-green-600 transition-colors">
+              <Newspaper className="w-5 h-5 mr-1" />
+                <span>Crop News</span>
               </Link>
               <div className="ml-4">
                 <UserButton />
