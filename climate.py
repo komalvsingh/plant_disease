@@ -1,6 +1,5 @@
 from fastapi import FastAPI, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from transformers import pipeline
 import requests
 import json
 import os
@@ -22,14 +21,11 @@ app.add_middleware(
 
 # Set API key directly (for testing only - in production use environment variables)
 OPENWEATHER_API_KEY = "99cb1b9cd1b074872d1dd824075271af"
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "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")  # Add your Groq API key as an environment variable
 
 # Sample coordinates (New York City)
 DEFAULT_LAT = 40.7128
 DEFAULT_LON = -74.0060
-
-# Initialize Hugging Face pipeline
-# You can change the model to any text generation model available on Hugging Face
-generator = pipeline('text-generation', model="gpt2")  # You can use other models like "facebook/opt-350m"
 
 def send_email(subject: str, message: str):
     try:
@@ -68,27 +64,62 @@ async def get_plant_care_recommendations(weather_data: Dict) -> str:
     temp = weather_data['main']['temp']
     humidity = weather_data['main']['humidity']
     conditions = weather_data['weather'][0]['description']
+    wind_speed = weather_data['wind']['speed']
     
-    prompt = f"""
-    Given the following weather conditions:
-    Temperature: {temp}°C
-    Humidity: {humidity}%
-    Conditions: {conditions}
+    # Create a prompt with detailed weather information
+    prompt = f"""Given the current weather conditions:
+    - Temperature: {temp}°C
+    - Humidity: {humidity}%
+    - Wind Speed: {wind_speed} m/s
+    - Conditions: {conditions}
     
-    Provide brief, practical recommendations for plant care and crop management.
+    Provide specific, actionable recommendations for agricultural practices and plant care. 
+    Include advice on:
+    1. Irrigation needs
+    2. Potential pest or disease risks
+    3. Crop protection measures
+    4. Optimal timing for agricultural activities
+    
+    Keep your response concise and practical for farmers to implement immediately.
     """
     
-    # Use Hugging Face pipeline for text generation
-    result = generator(prompt, max_length=250, num_return_sequences=1)
+    # Call Groq API for more accurate recommendations
+    groq_api_key = os.getenv("GROQ_API_KEY", GROQ_API_KEY)
+    if not groq_api_key:
+        return "Error: Groq API key not configured. Please set the GROQ_API_KEY environment variable."
     
-    # Extract the generated text
-    response = result[0]['generated_text']
+    headers = {
+        "Authorization": f"Bearer {groq_api_key}",
+        "Content-Type": "application/json"
+    }
     
-    # Try to extract only the recommendation part (after the prompt)
-    if len(response) > len(prompt):
-        response = response[len(prompt):].strip()
+    payload = {
+        "model": "llama3-8b-8192",  # You can use "llama3-70b-8192" for more advanced recommendations
+        "messages": [
+            {"role": "system", "content": "You are an agricultural expert providing actionable advice for farmers based on weather conditions."},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.5,
+        "max_tokens": 300
+    }
     
-    return response
+    try:
+        response = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers=headers,
+            json=payload
+        )
+        
+        if response.status_code == 200:
+            response_data = response.json()
+            recommendations = response_data["choices"][0]["message"]["content"]
+            return recommendations
+        else:
+            print(f"Error from Groq API: {response.status_code}, {response.text}")
+            return f"Error getting recommendations: {response.status_code}"
+    except Exception as e:
+        print(f"Exception calling Groq API: {str(e)}")
+        return f"Error: {str(e)}"
 
 @app.post("/api/weather-alerts")
 async def create_weather_alert(background_tasks: BackgroundTasks, user_data: Dict = None):
@@ -131,14 +162,14 @@ async def create_weather_alert(background_tasks: BackgroundTasks, user_data: Dic
             })
             email_notifications.append('Strong Wind Alert')
 
-        # Get plant care recommendations if there are alerts
-        recommendations = ""
-        if alerts:
-            recommendations = await get_plant_care_recommendations(weather_data)
-            alerts.append({
-                'type': 'info',
-                'message': f'Recommendations: {recommendations}'
-            })
+        # Get plant care recommendations using Groq
+        recommendations = await get_plant_care_recommendations(weather_data)
+        
+        # Add recommendations to alerts even if there are no warnings
+        alerts.append({
+            'type': 'info',
+            'message': f'Recommendations: {recommendations}'
+        })
 
         # Send email if there are alerts
         if email_notifications:
@@ -157,7 +188,8 @@ async def create_weather_alert(background_tasks: BackgroundTasks, user_data: Dic
             "humidity": humidity,
             "windSpeed": wind_speed,
             "conditions": conditions,
-            "alerts": alerts
+            "alerts": alerts,
+            "recommendations": recommendations
         }
 
     except Exception as e:
@@ -173,6 +205,14 @@ async def test_weather():
     """A simple endpoint to test the weather API without requiring a POST request"""
     weather_data = check_weather(DEFAULT_LAT, DEFAULT_LON)
     return weather_data
+
+# Add a test endpoint for Groq recommendations
+@app.get("/test-recommendations")
+async def test_recommendations():
+    """Test the Groq API recommendation generation"""
+    weather_data = check_weather(DEFAULT_LAT, DEFAULT_LON)
+    recommendations = await get_plant_care_recommendations(weather_data)
+    return {"recommendations": recommendations}
 
 if __name__ == "__main__":
     uvicorn.run(
