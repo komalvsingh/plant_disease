@@ -60,33 +60,49 @@ def check_weather(lat: float = DEFAULT_LAT, lon: float = DEFAULT_LON) -> Dict:
     
     return data
 
-async def get_plant_care_recommendations(weather_data: Dict) -> str:
+async def get_plant_recommendations(weather_data: Dict) -> Dict:
     temp = weather_data['main']['temp']
     humidity = weather_data['main']['humidity']
     conditions = weather_data['weather'][0]['description']
     wind_speed = weather_data['wind']['speed']
+    location_name = weather_data['name'] if 'name' in weather_data else "your area"
     
-    # Create a prompt with detailed weather information
-    prompt = f"""Given the current weather conditions:
+    # Create a more structured prompt with clear section markers
+    prompt = f"""Given the current weather conditions in {location_name}:
     - Temperature: {temp}°C
     - Humidity: {humidity}%
     - Wind Speed: {wind_speed} m/s
     - Conditions: {conditions}
     
-    Provide specific, actionable recommendations for agricultural practices and plant care. 
-    Include advice on:
+    Provide two clearly labeled sections with these exact headings:
+    
+    PART 1: PLANT CARE RECOMMENDATIONS
+    Provide specific, actionable recommendations for agricultural practices and plant care.
+    Include short, practical advice on:
     1. Irrigation needs
     2. Potential pest or disease risks
     3. Crop protection measures
     4. Optimal timing for agricultural activities
     
-    Keep your response concise and practical for farmers to implement immediately.
+    PART 2: SUITABLE PLANTS
+    Recommend 5-7 specific plants or crops that would thrive in the current conditions. 
+    For each recommended plant, include:
+    - Plant name
+    - Very brief reason why it's suitable for these conditions
+    - One simple care tip specific to the current weather
+    
+    IMPORTANT: Always include both section headers exactly as written above: "PART 1: PLANT CARE RECOMMENDATIONS" and "PART 2: SUITABLE PLANTS".
+    Format both sections with clear headings and bullet points for easy reading.
+    Keep your response concise and practical for immediate implementation.
     """
     
-    # Call Groq API for more accurate recommendations
+    # Call Groq API for recommendations
     groq_api_key = os.getenv("GROQ_API_KEY", GROQ_API_KEY)
     if not groq_api_key:
-        return "Error: Groq API key not configured. Please set the GROQ_API_KEY environment variable."
+        return {
+            "care_recommendations": "Error: Groq API key not configured. Please set the GROQ_API_KEY environment variable.",
+            "plant_recommendations": []
+        }
     
     headers = {
         "Authorization": f"Bearer {groq_api_key}",
@@ -96,11 +112,11 @@ async def get_plant_care_recommendations(weather_data: Dict) -> str:
     payload = {
         "model": "llama3-8b-8192",  # You can use "llama3-70b-8192" for more advanced recommendations
         "messages": [
-            {"role": "system", "content": "You are an agricultural expert providing actionable advice for farmers based on weather conditions."},
+            {"role": "system", "content": "You are an agricultural expert providing actionable advice for farmers based on weather conditions. You provide well-structured, clearly formatted responses with practical recommendations. Always follow the requested format exactly."},
             {"role": "user", "content": prompt}
         ],
         "temperature": 0.5,
-        "max_tokens": 300
+        "max_tokens": 800
     }
     
     try:
@@ -112,14 +128,53 @@ async def get_plant_care_recommendations(weather_data: Dict) -> str:
         
         if response.status_code == 200:
             response_data = response.json()
-            recommendations = response_data["choices"][0]["message"]["content"]
-            return recommendations
+            full_recommendations = response_data["choices"][0]["message"]["content"]
+            
+            # Improved parsing that's more flexible with formatting
+            # Try different possible section markers
+            part2_markers = ["PART 2: SUITABLE PLANTS", "PART 2:", "PART 2", "SUITABLE PLANTS:"]
+            part1_markers = ["PART 1: PLANT CARE RECOMMENDATIONS", "PART 1:", "PART 1", "PLANT CARE RECOMMENDATIONS:"]
+            
+            # Default values
+            care_recommendations = full_recommendations
+            plant_recommendations = "No plant recommendations available."
+            
+            # First clean up the response text - strip any system messages
+            cleaned_response = full_recommendations.replace("I'll provide recommendations based on the weather conditions you've shared.", "").strip()
+            
+            # Try to find Part 2 section
+            for marker in part2_markers:
+                if marker in cleaned_response:
+                    parts = cleaned_response.split(marker, 1)
+                    care_recommendations = parts[0]
+                    plant_recommendations = parts[1].strip()
+                    
+                    # Now clean up the care recommendations section
+                    for care_marker in part1_markers:
+                        if care_marker in care_recommendations:
+                            care_recommendations = care_recommendations.split(care_marker, 1)[1].strip()
+                            break
+                    break
+            
+            print("Care Recommendations:", care_recommendations)
+            print("Plant Recommendations:", plant_recommendations)
+            
+            return {
+                "care_recommendations": care_recommendations,
+                "plant_recommendations": plant_recommendations
+            }
         else:
             print(f"Error from Groq API: {response.status_code}, {response.text}")
-            return f"Error getting recommendations: {response.status_code}"
+            return {
+                "care_recommendations": f"Error getting recommendations: {response.status_code}",
+                "plant_recommendations": "Unable to retrieve plant recommendations at this time."
+            }
     except Exception as e:
         print(f"Exception calling Groq API: {str(e)}")
-        return f"Error: {str(e)}"
+        return {
+            "care_recommendations": f"Error: {str(e)}",
+            "plant_recommendations": "Unable to retrieve plant recommendations at this time."
+        }
 
 @app.post("/api/weather-alerts")
 async def create_weather_alert(background_tasks: BackgroundTasks, user_data: Dict = None):
@@ -136,6 +191,7 @@ async def create_weather_alert(background_tasks: BackgroundTasks, user_data: Dic
         humidity = weather_data['main']['humidity']
         wind_speed = weather_data['wind']['speed']
         conditions = weather_data['weather'][0]['description']
+        location_name = weather_data.get('name', 'your location')
         
         alerts = []
         email_notifications = []
@@ -162,34 +218,44 @@ async def create_weather_alert(background_tasks: BackgroundTasks, user_data: Dic
             })
             email_notifications.append('Strong Wind Alert')
 
-        # Get plant care recommendations using Groq
-        recommendations = await get_plant_care_recommendations(weather_data)
+        # Get plant care and plant type recommendations using Groq
+        recommendations = await get_plant_recommendations(weather_data)
         
-        # Add recommendations to alerts even if there are no warnings
+        # Add care recommendations to alerts
         alerts.append({
             'type': 'info',
-            'message': f'Recommendations: {recommendations}'
+            'message': f'Care Recommendations: {recommendations["care_recommendations"]}'
+        })
+        
+        # Add plant recommendations to alerts
+        alerts.append({
+            'type': 'info',
+            'message': f'Plant Recommendations: {recommendations["plant_recommendations"]}'
         })
 
         # Send email if there are alerts
         if email_notifications:
-            alert_subject = "Weather Alert for Your Crops"
-            alert_message = "\n".join([
-                "Weather Alerts:",
-                *[f"- {alert}" for alert in email_notifications],
-                "\nRecommendations:",
-                recommendations
+            alert_subject = f"Weather Alert for Your Crops in {location_name}"
+            alert_message = "\n\n".join([
+                "WEATHER ALERTS:",
+                "\n".join([f"- {alert}" for alert in email_notifications]),
+                "CARE RECOMMENDATIONS:",
+                recommendations["care_recommendations"],
+                "RECOMMENDED PLANTS:",
+                recommendations["plant_recommendations"]
             ])
             
             background_tasks.add_task(send_email, alert_subject, alert_message)
 
         return {
+            "location": location_name,
             "temperature": temp,
             "humidity": humidity,
             "windSpeed": wind_speed,
             "conditions": conditions,
             "alerts": alerts,
-            "recommendations": recommendations
+            "careRecommendations": recommendations["care_recommendations"],
+            "plantRecommendations": recommendations["plant_recommendations"]
         }
 
     except Exception as e:
@@ -199,25 +265,10 @@ async def create_weather_alert(background_tasks: BackgroundTasks, user_data: Dic
             "details": str(e)
         }
 
-# Add a simple test endpoint
-@app.get("/test-weather")
-async def test_weather():
-    """A simple endpoint to test the weather API without requiring a POST request"""
-    weather_data = check_weather(DEFAULT_LAT, DEFAULT_LON)
-    return weather_data
-
-# Add a test endpoint for Groq recommendations
-@app.get("/test-recommendations")
-async def test_recommendations():
-    """Test the Groq API recommendation generation"""
-    weather_data = check_weather(DEFAULT_LAT, DEFAULT_LON)
-    recommendations = await get_plant_care_recommendations(weather_data)
-    return {"recommendations": recommendations}
-
 if __name__ == "__main__":
     uvicorn.run(
         "main:app", 
         host="0.0.0.0", 
-        port=8001,  # Change this to your desired port
-        reload=True  # Optional: enables auto-reload during development
+        port=8001,
+        reload=True
     )
