@@ -84,11 +84,162 @@ async def get_treatment_recommendations(disease_name):
         
         # Call Groq API using our custom function
         recommendation_text = call_groq_api(prompt)
-        return recommendation_text
+        
+        # Try to parse the response as JSON
+        try:
+            # Check if we got a JSON response
+            if isinstance(recommendation_text, str):
+                # Sometimes the API might return a string with JSON inside
+                # Find the first { and last } to extract the JSON part
+                json_start = recommendation_text.find('{')
+                json_end = recommendation_text.rfind('}') + 1
+                
+                if json_start != -1 and json_end != -1:
+                    json_part = recommendation_text[json_start:json_end]
+                    recommendations_json = json.loads(json_part)
+                else:
+                    # If no JSON structure found, return the text as is but formatted
+                    return format_plain_text_recommendation(recommendation_text)
+            else:
+                # Direct JSON response
+                recommendations_json = json.loads(recommendation_text)
+                
+            # Format the recommendations in a clean, point-wise structure
+            formatted_recs = format_recommendations(recommendations_json)
+            return formatted_recs
+            
+        except json.JSONDecodeError:
+            # If JSON parsing fails, format as plain text
+            return format_plain_text_recommendation(recommendation_text)
         
     except Exception as e:
         print(f"Error getting recommendations: {str(e)}")
         return {"error": f"Failed to get recommendations: {str(e)}"}
+
+def format_recommendations(recommendations_json):
+    """Format the recommendations JSON into a clean, readable structure"""
+    formatted_output = ""
+    
+    # Add disease description
+    if "Brief Description of the Disease" in recommendations_json:
+        formatted_output += f"## Disease Description\n{recommendations_json['Brief Description of the Disease']}\n\n"
+    
+    # Add symptoms in bullet points
+    if "Symptoms" in recommendations_json:
+        formatted_output += "## Symptoms\n"
+        symptoms = recommendations_json["Symptoms"]
+        if isinstance(symptoms, dict):
+            for symptom_type, description in symptoms.items():
+                formatted_output += f"- **{symptom_type}**: {description}\n"
+        elif isinstance(symptoms, list):
+            for symptom in symptoms:
+                formatted_output += f"- {symptom}\n"
+        else:
+            formatted_output += f"{symptoms}\n"
+        formatted_output += "\n"
+    
+    # Add treatment methods
+    if "Treatment Methods" in recommendations_json:
+        formatted_output += "## Treatment Methods\n"
+        treatments = recommendations_json["Treatment Methods"]
+        
+        # Chemical options
+        if isinstance(treatments, dict) and "Chemical Options" in treatments:
+            formatted_output += "### Chemical Options\n"
+            chemical_options = treatments["Chemical Options"]
+            if isinstance(chemical_options, dict):
+                for option, desc in chemical_options.items():
+                    formatted_output += f"- **{option}**: {desc}\n"
+            else:
+                formatted_output += f"- {chemical_options}\n"
+        
+        # Organic options
+        if isinstance(treatments, dict) and "Organic Options" in treatments:
+            formatted_output += "\n### Organic Options\n"
+            organic_options = treatments["Organic Options"]
+            if isinstance(organic_options, dict):
+                for option, desc in organic_options.items():
+                    formatted_output += f"- **{option}**: {desc}\n"
+            else:
+                formatted_output += f"- {organic_options}\n"
+        
+        formatted_output += "\n"
+    
+    # Add preventive measures
+    if "Preventive Measures" in recommendations_json:
+        formatted_output += "## Preventive Measures\n"
+        preventives = recommendations_json["Preventive Measures"]
+        if isinstance(preventives, dict):
+            for measure, desc in preventives.items():
+                formatted_output += f"- **{measure}**: {desc}\n"
+        elif isinstance(preventives, list):
+            for measure in preventives:
+                formatted_output += f"- {measure}\n"
+        else:
+            formatted_output += f"{preventives}\n"
+        formatted_output += "\n"
+    
+    # Add additional care instructions
+    if "Additional Care Instructions" in recommendations_json:
+        formatted_output += "## Additional Care\n"
+        care = recommendations_json["Additional Care Instructions"]
+        if isinstance(care, dict):
+            for instruction, desc in care.items():
+                formatted_output += f"- **{instruction}**: {desc}\n"
+        elif isinstance(care, list):
+            for instruction in care:
+                formatted_output += f"- {instruction}\n"
+        else:
+            formatted_output += f"{care}\n"
+    
+    return formatted_output
+
+def format_plain_text_recommendation(text):
+    """Format plain text recommendation if JSON parsing fails"""
+    # Remove any code blocks or unnecessary formatting
+    text = text.replace("```json", "").replace("```", "")
+    
+    # Try to structure the text by common sections
+    sections = [
+        "Disease Description", "Brief Description", 
+        "Symptoms", 
+        "Treatment", "Treatment Methods",
+        "Preventive", "Prevention", "Preventive Measures",
+        "Additional Care", "Care Instructions"
+    ]
+    
+    formatted_text = "# Treatment Recommendation\n\n"
+    
+    # Split by potential section headers and format
+    lines = text.split('\n')
+    current_section = None
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+            
+        # Check if this line could be a section header
+        is_header = False
+        for section in sections:
+            if section.lower() in line.lower() and len(line) < 50:
+                formatted_text += f"\n## {line}\n"
+                current_section = section
+                is_header = True
+                break
+                
+        if not is_header:
+            # Format potential list items
+            if line.startswith('-') or line.startswith('*'):
+                formatted_text += f"{line}\n"
+            elif ':' in line and len(line.split(':')[0]) < 30:
+                # Potential key-value pair
+                key, value = line.split(':', 1)
+                formatted_text += f"- **{key.strip()}**: {value.strip()}\n"
+            else:
+                formatted_text += f"{line}\n"
+    
+    return formatted_text
 
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):

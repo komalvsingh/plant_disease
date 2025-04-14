@@ -51,17 +51,21 @@ const DiseaseDetectionPage = () => {
     }
   };
 
-  // Function to parse JSON from string if needed
+  // Updated parseRecommendations function for handling markdown
   const parseRecommendations = (recommendations) => {
     if (typeof recommendations === 'string') {
+      // We're now expecting markdown text directly
+      return recommendations;
+    }
+    // If it somehow came through as an object, stringify it for display
+    if (typeof recommendations === 'object') {
       try {
-        return JSON.parse(recommendations);
+        return JSON.stringify(recommendations, null, 2);
       } catch (e) {
-        // If not valid JSON, return as is
-        return recommendations;
+        return String(recommendations);
       }
     }
-    return recommendations;
+    return String(recommendations || '');
   };
 
   return (
@@ -204,131 +208,159 @@ const DiseaseDetectionPage = () => {
   );
 };
 
-// Component to handle different formats of recommendations
+// Component to handle markdown-formatted recommendations
 const TreatmentRecommendations = ({ recommendations }) => {
-  // Try to determine if recommendations is a JSON string, a parsed object, or plain text
-  let recContent;
-  
-  if (typeof recommendations === 'string') {
-    // Check if it looks like JSON (starts with { and ends with })
-    if (recommendations.trim().startsWith('{') && recommendations.trim().endsWith('}')) {
-      try {
-        const parsed = JSON.parse(recommendations);
-        recContent = (
-          <>
-            {parsed.description && (
-              <div className="mb-4">
-                <h4 className="font-semibold">Disease Description:</h4>
-                <p className="text-gray-700">{parsed.description}</p>
-              </div>
-            )}
-            
-            {parsed.symptoms && (
-              <div className="mb-4">
-                <h4 className="font-semibold">Symptoms:</h4>
-                <ul className="list-disc pl-5 text-gray-700">
-                  {typeof parsed.symptoms === 'string' 
-                    ? <li>{parsed.symptoms}</li> 
-                    : Array.isArray(parsed.symptoms) 
-                      ? parsed.symptoms.map((symptom, i) => <li key={i}>{symptom}</li>)
-                      : <li>{JSON.stringify(parsed.symptoms)}</li>}
-                </ul>
-              </div>
-            )}
-            
-            {parsed.treatment && (
-              <div className="mb-4">
-                <h4 className="font-semibold">Treatment Methods:</h4>
-                <div className="space-y-3 mt-2">
-                  {typeof parsed.treatment === 'string' 
-                    ? <p className="text-gray-700">{parsed.treatment}</p>
-                    : Object.entries(parsed.treatment).map(([key, value], i) => (
-                        <TreatmentStep key={i} number={i+1} title={key} description={value} />
-                      ))}
-                </div>
-              </div>
-            )}
-            
-            {parsed.prevention && (
-              <div className="mb-4">
-                <h4 className="font-semibold">Prevention:</h4>
-                <ul className="list-disc pl-5 text-gray-700">
-                  {typeof parsed.prevention === 'string' 
-                    ? <li>{parsed.prevention}</li> 
-                    : Array.isArray(parsed.prevention) 
-                      ? parsed.prevention.map((item, i) => <li key={i}>{item}</li>)
-                      : <li>{JSON.stringify(parsed.prevention)}</li>}
-                </ul>
-              </div>
-            )}
-          </>
-        );
-      } catch (e) {
-        // If parsing fails, treat as plain text
-        recContent = <p className="text-gray-700">{recommendations}</p>;
-      }
-    } else {
-      // Plain text
-      recContent = <p className="text-gray-700">{recommendations}</p>;
-    }
-  } else if (typeof recommendations === 'object') {
-    // Already parsed object
-    recContent = (
-      <>
-        <div className="space-y-4">
-          <TreatmentStep 
-            number="1"
-            title="Remove infected parts:"
-            description="Prune or dig up and destroy infected leaves, branches, or entire plants"
-          />
-          <TreatmentStep 
-            number="2"
-            title="Use Fungicide:"
-            description="Apply a fungicide early in the growing season or when symptoms first appear"
-          />
-          <TreatmentStep 
-            number="3"
-            title="Use antibiotics:"
-            description="Apply antibiotics like copper or streptomycin to bacterial blights if appropriate"
-          />
-        </div>
-      </>
-    );
-  } else {
-    // Fallback content
-    recContent = (
-      <p className="text-gray-700">Please consult with an agricultural expert for specific treatment recommendations.</p>
+  // Check if recommendations is a string (which it should be now as markdown)
+  if (!recommendations) {
+    return (
+      <div className="bg-green-50 rounded-xl p-6 mt-6">
+        <h3 className="text-xl font-semibold text-green-800 mb-4">Treatment Recommended:</h3>
+        <p className="text-gray-700">No specific recommendations available. Please consult with an agricultural expert.</p>
+      </div>
     );
   }
+
+  // Parse the markdown-like content into React components
+  const renderMarkdownContent = (content) => {
+    if (!content || typeof content !== 'string') return null;
+
+    // Split content by lines
+    const lines = content.split('\n');
+    const renderedContent = [];
+
+    let currentList = [];
+    let inList = false;
+    let currentHeading = null;
+
+    lines.forEach((line, index) => {
+      // Handle headings (## Heading)
+      if (line.startsWith('## ')) {
+        // If we were building a list, add it before starting a new section
+        if (inList && currentList.length > 0) {
+          renderedContent.push(
+            <ul key={`list-${renderedContent.length}`} className="list-disc pl-5 text-gray-700 mb-4">
+              {currentList}
+            </ul>
+          );
+          currentList = [];
+          inList = false;
+        }
+
+        currentHeading = line.substring(3).trim();
+        renderedContent.push(
+          <h4 key={`heading-${index}`} className="font-semibold text-green-800 mt-4 mb-2">
+            {currentHeading}
+          </h4>
+        );
+      }
+      // Handle subheadings (### Subheading)
+      else if (line.startsWith('### ')) {
+        // If we were building a list, add it before starting a new subsection
+        if (inList && currentList.length > 0) {
+          renderedContent.push(
+            <ul key={`list-${renderedContent.length}`} className="list-disc pl-5 text-gray-700 mb-3">
+              {currentList}
+            </ul>
+          );
+          currentList = [];
+          inList = false;
+        }
+
+        renderedContent.push(
+          <h5 key={`subheading-${index}`} className="font-medium text-green-700 mt-3 mb-2">
+            {line.substring(4).trim()}
+          </h5>
+        );
+      }
+      // Handle list items
+      else if (line.startsWith('- ')) {
+        inList = true;
+        const itemContent = line.substring(2);
+        
+        // Check for bold text within list items
+        if (itemContent.includes('**')) {
+          const parts = itemContent.split('**');
+          // Bold text pattern: **text**
+          if (parts.length >= 3) {
+            currentList.push(
+              <li key={`item-${index}`} className="mb-1">
+                <span className="font-semibold">{parts[1]}</span>
+                {parts[2]}
+              </li>
+            );
+          } else {
+            currentList.push(<li key={`item-${index}`} className="mb-1">{itemContent}</li>);
+          }
+        } else {
+          currentList.push(<li key={`item-${index}`} className="mb-1">{itemContent}</li>);
+        }
+      }
+      // Regular text paragraph
+      else if (line.trim() !== '') {
+        // If we were building a list, add it before starting a paragraph
+        if (inList && currentList.length > 0) {
+          renderedContent.push(
+            <ul key={`list-${renderedContent.length}`} className="list-disc pl-5 text-gray-700 mb-4">
+              {currentList}
+            </ul>
+          );
+          currentList = [];
+          inList = false;
+        }
+        
+        renderedContent.push(
+          <p key={`paragraph-${index}`} className="text-gray-700 mb-3">
+            {line}
+          </p>
+        );
+      }
+      // Empty line
+      else if (line.trim() === '') {
+        // If we were building a list, finish it
+        if (inList && currentList.length > 0) {
+          renderedContent.push(
+            <ul key={`list-${renderedContent.length}`} className="list-disc pl-5 text-gray-700 mb-4">
+              {currentList}
+            </ul>
+          );
+          currentList = [];
+          inList = false;
+        }
+      }
+    });
+
+    // Add any remaining list items
+    if (inList && currentList.length > 0) {
+      renderedContent.push(
+        <ul key={`list-final`} className="list-disc pl-5 text-gray-700 mb-4">
+          {currentList}
+        </ul>
+      );
+    }
+
+    return renderedContent;
+  };
 
   return (
     <div className="bg-green-50 rounded-xl p-6 mt-6">
       <h3 className="text-xl font-semibold text-green-800 mb-4">Treatment Recommended:</h3>
-      {recContent}
+      <div className="recommendation-content">
+        {renderMarkdownContent(recommendations)}
+      </div>
       
-      {/* Additional Information */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-        <div className="bg-blue-50 p-4 rounded-lg">
-          <h4 className="font-semibold text-blue-800 mb-2">Prevention Tips</h4>
-          <ul className="text-gray-700 space-y-2">
-            <li>• Maintain proper plant spacing</li>
-            <li>• Avoid overhead watering</li>
-            <li>• Practice crop rotation</li>
-          </ul>
-        </div>
-        <div className="bg-orange-50 p-4 rounded-lg">
-          <h4 className="font-semibold text-orange-800 mb-2">Warning Signs</h4>
-          <ul className="text-gray-700 space-y-2">
-            <li>• Yellow or brown spots on leaves</li>
-            <li>• Wilting or drooping</li>
-            <li>• Stunted growth</li>
-          </ul>
-        </div>
+      {/* Additional Information - Optional help section */}
+      <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+        <h4 className="font-semibold text-blue-800 mb-2">Need Additional Help?</h4>
+        <p className="text-gray-700">
+          For personalized assistance, consider consulting with a local agricultural expert or 
+          extension service. They can provide guidance specific to your region and growing conditions.
+        </p>
       </div>
     </div>
   );
 };
 
+// Treatment step component (kept as a utility for potential future use)
 const TreatmentStep = ({ number, title, description }) => {
   return (
     <div className="flex items-start space-x-3">
@@ -344,5 +376,3 @@ const TreatmentStep = ({ number, title, description }) => {
 };
 
 export default DiseaseDetectionPage;
-
-
