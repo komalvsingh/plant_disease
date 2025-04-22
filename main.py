@@ -11,7 +11,7 @@ import requests
 import json
 
 app = FastAPI()
-model = load_model("plant_model.h5", compile=False)
+model = load_model("plant_model_new.h5", compile=False)
 
 app.add_middleware(
     CORSMiddleware,
@@ -56,15 +56,19 @@ def call_groq_api(prompt, model_name="llama3-70b-8192"):
         print(f"Error calling Groq API: {str(e)}")
         return {"error": f"Failed to get recommendations: {str(e)}"}
 
-class_names = [
-    'Pepper_bell_Bacterial_spot', 'Pepperbell__healthy',
-    'Potato__Early_blight', 'Potato_Late_blight', 'Potato__healthy',
-    'Tomato_Bacterial_spot', 'Tomato_Early_blight', 'Tomato_Late_blight',
-    'Tomato_Leaf_Mold', 'Tomato_Septoria_leaf_spot',
-    'Tomato_Spider_mites_Two_spotted_spider_mite', 'Tomato__Target_Spot',
-    'Tomato_Tomato_YellowLeafCurl_Virus', 'Tomato_Tomato_mosaic_virus',
-    'Tomato_healthy'
-]
+class_names = ['Apple__Apple_scab', 'Apple_Black_rot', 'Apple_Cedar_apple_rust', 'Apple__healthy',
+               'Blueberry__healthy', 'Cherry(including_sour)Powdery_mildew', 'Cherry(including_sour)_healthy',
+               'Corn_(maize)Cercospora_leaf_spot Gray_leaf_spot', 'Corn(maize)Common_rust',
+               'Corn_(maize)Northern_Leaf_Blight', 'Corn(maize)healthy', 'Grape__Black_rot',
+               'Grape__Esca(Black_Measles)', 'Grape__Leaf_blight(Isariopsis_Leaf_Spot)', 'Grape___healthy',
+               'Orange__Haunglongbing(Citrus_greening)', 'Peach__Bacterial_spot', 'Peach__healthy',
+               'Pepper,bell_Bacterial_spot', 'Pepper,_bell_healthy', 'Potato__Early_blight',
+               'Potato__Late_blight', 'Potato_healthy', 'Raspberry_healthy', 'Soybean__healthy',
+               'Squash__Powdery_mildew', 'Strawberry_Leaf_scorch', 'Strawberry__healthy',
+               'Tomato__Bacterial_spot', 'Tomato_Early_blight', 'Tomato__Late_blight',
+               'Tomato__Leaf_Mold', 'Tomato__Septoria_leaf_spot',
+               'Tomato__Spider_mites Two-spotted_spider_mite', 'Tomato__Target_Spot',
+               'Tomato__Tomato_Yellow_Leaf_Curl_Virus', 'Tomato_Tomato_mosaic_virus', 'Tomato__healthy']
 
 async def get_treatment_recommendations(disease_name):
     """Get treatment recommendations from Groq API for the identified plant disease"""

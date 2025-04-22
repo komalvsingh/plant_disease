@@ -14,7 +14,7 @@ dist-ssr
 
 .env
 _pycache_
-plant_model.h5
+plant_model_new.h5
 venv
 
 # Editor directories and files
